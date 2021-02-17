@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	testhelpers "go.mongodb.org/mongo-driver/internal/testutil/helpers"
 	"go.mongodb.org/mongo-driver/x/network/connstring"
 	"go.mongodb.org/mongo-driver/x/network/description"
 )
@@ -113,6 +113,8 @@ func runSeedlistTest(t *testing.T, filename string, test *seedlistTestCase) {
 
 // Test case for all connection string spec tests.
 func TestInitialDNSSeedlistDiscoverySpec(t *testing.T) {
+	t.Skip("skipping in continuous matrix testing project due to known failures on Ubuntu 18.04")
+
 	if os.Getenv("TOPOLOGY") != "replica_set" || os.Getenv("AUTH") != "noauth" {
 		t.Skip("Skipping on non-replica set topology")
 	}
