@@ -860,18 +860,18 @@ func addCACertFromFile(cfg *tls.Config, file string) error {
 	return nil
 }
 
-func addClientCertFromSeparateFiles(cfg *tls.Config, keyFile, certFile, keyPassword string) (string, error) {
-	keyData, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return "", err
-	}
+func addClientCertFromSeparateFiles(cfg *tls.Config, certFile, keyFile, keyPassword string) (string, error) {
 	certData, err := ioutil.ReadFile(certFile)
 	if err != nil {
 		return "", err
 	}
+	keyData, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return "", err
+	}
 
-	data := append(keyData, '\n')
-	data = append(data, certData...)
+	data := append(certData, '\n')
+	data = append(data, keyData...)
 	return addClientCertFromBytes(cfg, data, keyPassword)
 }
 
@@ -888,7 +888,7 @@ func addClientCertFromConcatenatedFile(cfg *tls.Config, certKeyFile, keyPassword
 // containing file and returns the certificate's subject name.
 func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (string, error) {
 	var currentBlock *pem.Block
-	var certBlock, certDecodedBlock, keyBlock []byte
+	var certBlock, keyBlock []byte
 
 	remaining := data
 	start := 0
@@ -899,9 +899,7 @@ func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (str
 		}
 
 		if currentBlock.Type == "CERTIFICATE" {
-			certBlock = data[start : len(data)-len(remaining)]
-			certDecodedBlock = currentBlock.Bytes
-			start += len(certBlock)
+			start += len(data) - len(remaining) - start
 		} else if strings.HasSuffix(currentBlock.Type, "PRIVATE KEY") {
 			isEncrypted := x509.IsEncryptedPEMBlock(currentBlock) || strings.Contains(currentBlock.Type, "ENCRYPTED PRIVATE KEY")
 			if isEncrypted {
@@ -932,11 +930,11 @@ func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (str
 				var encoded bytes.Buffer
 				pem.Encode(&encoded, &pem.Block{Type: currentBlock.Type, Bytes: keyBytes})
 				keyBlock = encoded.Bytes()
-				start = len(data) - len(remaining)
 			} else {
 				keyBlock = data[start : len(data)-len(remaining)]
-				start += len(keyBlock)
 			}
+			certBlock = data[0:start]
+			break
 		}
 	}
 	if len(certBlock) == 0 {
@@ -955,12 +953,21 @@ func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (str
 
 	// The documentation for the tls.X509KeyPair indicates that the Leaf certificate is not
 	// retained.
-	crt, err := x509.ParseCertificate(certDecodedBlock)
+	crt, err := leaf(&cert)
 	if err != nil {
 		return "", err
 	}
 
 	return x509CertSubject(crt), nil
+}
+
+// leaf returns the parsed leaf certificate, either from c.Leaf or by parsing
+// the corresponding c.Certificate[0].
+func leaf(c *tls.Certificate) (*x509.Certificate, error) {
+	if c.Leaf != nil {
+		return c.Leaf, nil
+	}
+	return x509.ParseCertificate(c.Certificate[0])
 }
 
 func stringSliceContains(source []string, target string) bool {
