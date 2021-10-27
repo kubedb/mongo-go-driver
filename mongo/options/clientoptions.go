@@ -1009,7 +1009,7 @@ func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (str
 					if err != nil {
 						return "", err
 					}
-					keyBytes, err = x509MarshalPKCS8PrivateKey(decrypted)
+					keyBytes, err = x509.MarshalPKCS8PrivateKey(decrypted)
 					if err != nil {
 						return "", err
 					}
@@ -1045,7 +1045,7 @@ func addClientCertFromBytes(cfg *tls.Config, data []byte, keyPasswd string) (str
 		return "", err
 	}
 
-	return x509CertSubject(crt), nil
+	return crt.Subject.String(), nil
 }
 
 // leaf returns the parsed leaf certificate, either from c.Leaf or by parsing
